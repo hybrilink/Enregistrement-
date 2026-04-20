@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>enregistrement bordereaux - Faculté Agronomique</title>
+    <meta name="application-name" content="hybrilink enregistrement">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="hybrilink enregistrement">
+    <meta name="description" content="Gestion des enregistrement">
+    <meta name="theme-color" content="#003366">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="icon-96x96.png">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Times New Roman', serif;
+            background: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .print-container {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            padding: 15px;
+        }
+        
+        /* Deux bordereaux sur une page A4 */
+        .receipts-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .receipt-exemplaire {
+            border: 1px solid #000;
+            border-radius: 5px;
+            padding: 15px 20px;
+            background: white;
+            font-family: 'Times New Roman', serif;
+            position: relative;
+            overflow: hidden;
+            page-break-inside: avoid;
+            flex: 1;
+        }
+        
+        .receipt-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%;
+            height: auto;
+            opacity: 0.1;
+            pointer-events: none;
+            z-index: 0;
+            text-align: center;
+        }
+        
+        .receipt-watermark img {
+            width: 100%;
+            height: auto;
+            max-width: 150px;
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .receipt-content {
+            position: relative;
+            z-index: 1;
+            background: transparent;
+        }
+        
+        .receipt-logo {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        
+        .receipt-logo-left {
+            width: 55px;
+            height: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .receipt-logo-left img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .receipt-logo-text {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .receipt-logo-text h2 {
+            font-size: 14px;
+            margin: 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+        }
+        
+        .receipt-logo-text h3 {
+            font-size: 12px;
+            margin: 3px 0;
+            text-transform: uppercase;
+        }
+        
+        .receipt-logo-text p {
+            font-size: 11px;
+            margin: 0;
+            font-weight: bold;
+        }
+        
+        .receipt-logo-right {
+            width: 55px;
+        }
+        
+        .receipt-number {
+            text-align: right;
+            font-size: 12px;
+            font-weight: bold;
+            color: red;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #ccc;
+        }
+        
+        .receipt-body {
+            margin: 15px 0;
+        }
+        
+        .receipt-line {
+            margin: 10px 0;
+            display: flex;
+            align-items: baseline;
+        }
+        
+        .receipt-label {
+            width: 150px;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .receipt-value-empty {
+            flex: 1;
+            border-bottom: 1px dotted #000;
+            padding-left: 8px;
+            font-size: 12px;
+            min-height: 20px;
+            color: #999;
+            font-style: italic;
+        }
+        
+        .receipt-amount {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .receipt-amount-line {
+            margin: 5px 0;
+            font-size: 12px;
+        }
+        
+        .receipt-amount-number {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 5px 0;
+            min-height: 25px;
+            border-bottom: 1px dotted #000;
+            display: inline-block;
+            padding: 0 20px;
+        }
+        
+        .receipt-amount-letters {
+            font-size: 11px;
+            font-style: italic;
+            min-height: 20px;
+            border-bottom: 1px dotted #000;
+            display: inline-block;
+            padding: 0 15px;
+            margin: 5px 0;
+        }
+        
+        .receipt-footer {
+            margin-top: 20px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        
+        .receipt-signature {
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px dashed #000;
+        }
+        
+        .receipt-signature-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        
+        .receipt-devise {
+            font-size: 11px;
+            font-style: italic;
+        }
+        
+        .receipt-signature-right {
+            text-align: right;
+            min-width: 180px;
+        }
+        
+        .btn-print {
+            background: #003366;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 20px auto 10px;
+            display: block;
+            transition: all 0.3s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        .btn-print:hover {
+            background: #002244;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.3);
+        }
+        
+        .info-note {
+            text-align: center;
+            margin-top: 10px;
+            color: #666;
+            font-size: 12px;
+            font-style: italic;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                margin: 0;
+            }
+            
+            .print-container {
+                box-shadow: none;
+                padding: 0;
+                max-width: none;
+            }
+            
+            .btn-print, .info-note {
+                display: none;
+            }
+            
+            .receipts-wrapper {
+                gap: 0;
+            }
+            
+            .receipt-exemplaire {
+                margin-bottom: 0;
+                page-break-inside: avoid;
+                border: 1px solid #000;
+                border-radius: 0;
+            }
+            
+            @page {
+                size: A4;
+                margin: 1.2cm 1cm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-container">
+        <div class="receipts-wrapper">
+            <!-- Exemplaire 1 - Original -->
+            <div class="receipt-exemplaire">
+                <div class="receipt-watermark">
+                    <img src="th.png" alt="Logo" onerror="this.style.display='none'">
+                </div>
+                <div class="receipt-content">
+                    <div class="receipt-logo">
+                        <div class="receipt-logo-left">
+                            <img src="th.png" alt="Logo" onerror="this.parentElement.innerHTML='<svg viewBox=\'0 0 100 100\' width=\'55\' height=\'55\'><circle cx=\'50\' cy=\'50\' r=\'45\' fill=\'#003366\'/><text x=\'50\' y=\'55\' text-anchor=\'middle\' font-size=\'14\' fill=\'#ffb347\' font-weight=\'bold\'>UNILU</text><text x=\'50\' y=\'70\' text-anchor=\'middle\' font-size=\'9\' fill=\'#ffb347\'>FSA</text></svg>'">
+                        </div>
+                        <div class="receipt-logo-text">
+                            <h2>UNIVERSITÉ DE LUBUMBASHI</h2>
+                            <h3>ADMINISTRATION DU BUDGET</h3>
+                            <p>FACULTÉ DES SCIENCES AGRONOMIQUES</p>
+                        </div>
+                        <div class="receipt-logo-right"></div>
+                    </div>
+                    
+                    <div class="receipt-number">
+                        N° _______________ - Exemplaire 1 (Original)
+                    </div>
+                    
+                    <div class="receipt-body">
+                        <div class="receipt-line">
+                            <span class="receipt-label">Reçu de l'étudiant(e) :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        <div class="receipt-line">
+                            <span class="receipt-label">Promotion :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        <div class="receipt-line">
+                            <span class="receipt-label">Matricule :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        
+                        <div class="receipt-amount">
+                            <div class="receipt-amount-line">La somme de (En chiffres)</div>
+                            <div class="receipt-amount-number">_________________ FC</div>
+                            <div class="receipt-amount-line">(En lettres)</div>
+                            <div class="receipt-amount-letters">_________________________________________________________________________</div>
+                        </div>
+                        
+                        <div class="receipt-line">
+                            <span class="receipt-label">Motif :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        <div class="receipt-line">
+                            <span class="receipt-label">Année académique :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                    </div>
+                    
+                    <div class="receipt-footer">
+                        <div>Fait à Lubumbashi, le ___________________</div>
+                        <div>Signature de l'AB</div>
+                    </div>
+                    
+                    <div class="receipt-signature">
+                        <div class="receipt-signature-line">
+                            <div class="receipt-devise">SCIENTIA SPLENDET ET CONSCIENTIA</div>
+                            <div class="receipt-signature-right">
+                                <div>_________________________________</div>
+                                <div style="margin-top: 3px; font-size: 10px;">(Nom et signature du comptable)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Exemplaire 2 - Copie -->
+            <div class="receipt-exemplaire">
+                <div class="receipt-watermark">
+                    <img src="th.png" alt="Logo" onerror="this.style.display='none'">
+                </div>
+                <div class="receipt-content">
+                    <div class="receipt-logo">
+                        <div class="receipt-logo-left">
+                            <img src="th.png" alt="Logo" onerror="this.parentElement.innerHTML='<svg viewBox=\'0 0 100 100\' width=\'55\' height=\'55\'><circle cx=\'50\' cy=\'50\' r=\'45\' fill=\'#003366\'/><text x=\'50\' y=\'55\' text-anchor=\'middle\' font-size=\'14\' fill=\'#ffb347\' font-weight=\'bold\'>UNILU</text><text x=\'50\' y=\'70\' text-anchor=\'middle\' font-size=\'9\' fill=\'#ffb347\'>FSA</text></svg>'">
+                        </div>
+                        <div class="receipt-logo-text">
+                            <h2>UNIVERSITÉ DE LUBUMBASHI</h2>
+                            <h3>ADMINISTRATION DU BUDGET</h3>
+                            <p>FACULTÉ DES SCIENCES AGRONOMIQUES</p>
+                        </div>
+                        <div class="receipt-logo-right"></div>
+                    </div>
+                    
+                    <div class="receipt-number">
+                        N° _______________ - Exemplaire 2 (Copie)
+                    </div>
+                    
+                    <div class="receipt-body">
+                        <div class="receipt-line">
+                            <span class="receipt-label">Reçu de l'étudiant(e) :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        <div class="receipt-line">
+                            <span class="receipt-label">Promotion :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        <div class="receipt-line">
+                            <span class="receipt-label">Matricule :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        
+                        <div class="receipt-amount">
+                            <div class="receipt-amount-line">La somme de (En chiffres)</div>
+                            <div class="receipt-amount-number">_________________ FC</div>
+                            <div class="receipt-amount-line">(En lettres)</div>
+                            <div class="receipt-amount-letters">_________________________________________________________________________</div>
+                        </div>
+                        
+                        <div class="receipt-line">
+                            <span class="receipt-label">Motif :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                        <div class="receipt-line">
+                            <span class="receipt-label">Année académique :</span>
+                            <span class="receipt-value-empty">_____________________________________________</span>
+                        </div>
+                    </div>
+                    
+                    <div class="receipt-footer">
+                        <div>Fait à Lubumbashi, le ___________________</div>
+                        <div>Signature de l'AB</div>
+                    </div>
+                    
+                    <div class="receipt-signature">
+                        <div class="receipt-signature-line">
+                            <div class="receipt-devise">SCIENTIA SPLENDET ET CONSCIENTIA</div>
+                            <div class="receipt-signature-right">
+                                <div>_________________________________</div>
+                                <div style="margin-top: 3px; font-size: 10px;">(Nom et signature du comptable)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <button class="btn-print" onclick="window.print()">
+        🖨️ Imprimer les bordereaux (2 par page A4)
+    </button>
+    
+    <div class="info-note">
+        <i>💡 Deux bordereaux (Original + Copie) sur une seule page A4<br>
+        Le logo "th.png" sera affiché s'il se trouve dans le même dossier que ce fichier.</i>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 Bordereaux vierges - Faculté des Sciences Agronomiques - UNILU');
+            console.log('✅ Deux exemplaires par page A4 - Prêt à imprimer');
+            
+            // Vérifier si le logo th.png est accessible
+            const img = new Image();
+            img.onerror = function() {
+                console.warn('⚠️ Le fichier th.png n\'a pas été trouvé. Un logo de remplacement SVG sera utilisé.');
+            };
+            img.src = 'th.png';
+        });
+
+ 
+        // ========== INITIALISATION ==========
+        
+        initNotificationSound();
+        listenNewTransactions();
+        setupRealtimeListeners();
+        
+        setTimeout(() => requestNotificationPermission(), 5000);
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('Service Worker enregistré:', reg.scope);
+                }).catch(err => console.log('Erreur Service Worker:', err));
+            });
+        }
+        
+    </script>
+</body>
+</html>
