@@ -301,7 +301,10 @@
         
         function escapeHtml(t) { if(!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
         
-        
+        function checkSession() {
+            const session = localStorage.getItem('admin_user');
+            if(!session) window.location.href = 'admin.html';
+        }
         
         async function loadData() {
             try {
@@ -866,7 +869,7 @@
         
         document.getElementById('logoutBtn')?.addEventListener('click', () => {
             localStorage.removeItem('admin_user');
-            
+            window.location.href = 'admin.html';
         });
         
         // Initialisation
