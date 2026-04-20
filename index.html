@@ -22,7 +22,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root { --primary-blue: #003366; --dark-blue: #002244; --accent-yellow: #ffb347; --success-green: #28a745; }
-        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
         .navbar-custom { background: var(--primary-blue); box-shadow: 0 4px 15px rgba(0,0,0,0.2); padding: 10px 0; }
         .btn-action { background: var(--primary-blue); color: white; border: none; padding: 12px 25px; border-radius: 10px; transition: all 0.3s; font-weight: 600; }
         .btn-action:hover { background: var(--dark-blue); transform: translateY(-2px); }
@@ -70,17 +70,25 @@
         .search-input-group i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #999; }
         .search-input-group input { padding-left: 35px; }
         .fiche-skipped { background: #fff3e0; border-left: 4px solid #ff9800; padding: 10px 15px; margin-top: 10px; border-radius: 8px; }
+        .nav-tabs .nav-link { color: var(--primary-blue); font-weight: 500; }
+        .nav-tabs .nav-link.active { background-color: var(--primary-blue); color: white; border-color: var(--primary-blue); }
+        .badge-premier { background-color: #28a745; color: white; }
+        .badge-deuxieme { background-color: #ff9800; color: white; }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-custom">
         <div class="container">
-            <a class="navbar-brand text-white" href="#"><i class="bi bi-cash-stack"></i> Gestion des Paiements - Faculté Agronomique</a>
-            
+            <a class="navbar-brand text-white" href="#">
+                <i class="bi bi-cash-stack"></i> Gestion des Paiements - Faculté Agronomique
+            </a>
+            <span class="text-white-50">
+                <i class="bi bi-person-badge"></i> Agent Paiement
+            </span>
         </div>
     </nav>
     
-    <div class="container mt-4" style="min-height: calc(100vh - 150px);">
+    <div class="container mt-4" style="flex: 1;">
         <div id="toastContainer" class="toast-notification"></div>
         
         <!-- Onglets principaux -->
@@ -137,7 +145,7 @@
                             </div>
                         </div>
                         
-                        <!-- Étape 2: Saisie du premier bordereau (ou unique) -->
+                        <!-- Étape 2: Saisie du premier bordereau -->
                         <div id="step2" class="step-container">
                             <div class="text-center mb-4">
                                 <i class="bi bi-receipt" style="font-size: 48px; color: var(--primary-blue);"></i>
@@ -157,7 +165,7 @@
                             <!-- Informations de l'étudiant -->
                             <div id="studentInfoContainer" style="display: none;"></div>
                             
-                            <!-- Fiches manquantes (si le bordereau ne couvre pas tout) -->
+                            <!-- Fiches manquantes -->
                             <div id="missingFichesContainer" style="display: none;"></div>
                             
                             <div class="text-center mt-4">
@@ -262,6 +270,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script>
+        // ==========================================
+        // CONFIGURATION FIREBASE
+        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyBb82N2-5ns7qKjQBAj5UvDW87s2PZ27F0",
             authDomain: "fsa-unilu.firebaseapp.com",
@@ -274,7 +285,9 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         
-        // Variables globales
+        // ==========================================
+        // VARIABLES GLOBALES
+        // ==========================================
         let allPromotions = [];
         let allEtudiants = [];
         let allFiches = [];
@@ -288,6 +301,9 @@
         let currentFilterPromotion = null;
         let currentSearchRegistered = '';
         
+        // ==========================================
+        // FONCTIONS UTILITAIRES
+        // ==========================================
         function showToast(message, type = 'success') {
             const container = document.getElementById('toastContainer');
             if(!container) return;
@@ -299,39 +315,50 @@
             setTimeout(() => container.firstElementChild?.remove(), 4000);
         }
         
-        function escapeHtml(t) { if(!t) return ''; const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-        
-        function checkSession() {
-            const session = localStorage.getItem('admin_user');
-            if(!session) window.location.href = 'admin.html';
+        function escapeHtml(t) { 
+            if(!t) return ''; 
+            const d = document.createElement('div'); 
+            d.textContent = t; 
+            return d.innerHTML; 
         }
         
+        // ==========================================
+        // CHARGEMENT DES DONNÉES
+        // ==========================================
         async function loadData() {
             try {
+                // Charger les promotions
                 const promotionsSnap = await db.collection('promotions').get();
                 allPromotions = [];
                 promotionsSnap.forEach(doc => allPromotions.push({ id: doc.id, ...doc.data() }));
                 
+                // Charger les étudiants
                 const etudiantsSnap = await db.collection('etudiants').get();
                 allEtudiants = [];
                 etudiantsSnap.forEach(doc => allEtudiants.push({ id: doc.id, ...doc.data() }));
                 
+                // Charger les fiches
                 const fichesSnap = await db.collection('fiches').get();
                 allFiches = [];
                 fichesSnap.forEach(doc => allFiches.push({ id: doc.id, ...doc.data() }));
                 
+                // Charger la configuration des semestres
                 const configDoc = await db.collection('configurations').doc('semestres').get();
                 if(configDoc.exists) semestreConfig = configDoc.data();
                 
+                // Charger la liste des succès
                 await loadRegisteredSuccessList();
                 
+                // Mettre à jour l'interface
                 updateSemestreFichesList();
                 updatePromotionFilter();
                 displayRegisteredStudents();
                 
+                showToast('Données chargées avec succès', 'success');
+                
             } catch(err) {
                 console.error('Erreur chargement données:', err);
-                showToast('Erreur de chargement des données', 'danger');
+                showToast('Erreur de chargement des données. Rafraîchissez la page.', 'danger');
             }
         }
         
@@ -346,13 +373,20 @@
                 return fiche ? fiche.nom : null;
             }).filter(f => f);
             
-            document.getElementById('premierSemestreFichesListe').innerHTML = premierFiches.length > 0 ? 
-                `<small>Fiches: ${premierFiches.join(', ')}</small>` : 
-                '<small class="text-warning">Aucune fiche configurée</small>';
-                
-            document.getElementById('deuxiemeSemestreFichesListe').innerHTML = deuxiemeFiches.length > 0 ? 
-                `<small>Fiches: ${deuxiemeFiches.join(', ')}</small>` : 
-                '<small class="text-warning">Aucune fiche configurée</small>';
+            const premierElem = document.getElementById('premierSemestreFichesListe');
+            const deuxiemeElem = document.getElementById('deuxiemeSemestreFichesListe');
+            
+            if(premierElem) {
+                premierElem.innerHTML = premierFiches.length > 0 ? 
+                    `<small>Fiches: ${premierFiches.join(', ')}</small>` : 
+                    '<small class="text-warning">Aucune fiche configurée</small>';
+            }
+            
+            if(deuxiemeElem) {
+                deuxiemeElem.innerHTML = deuxiemeFiches.length > 0 ? 
+                    `<small>Fiches: ${deuxiemeFiches.join(', ')}</small>` : 
+                    '<small class="text-warning">Aucune fiche configurée</small>';
+            }
         }
         
         async function loadRegisteredSuccessList() {
@@ -369,17 +403,17 @@
         function updatePromotionFilter() {
             const container = document.getElementById('promotionButtonsRegistered');
             if(container) {
-                let html = '';
+                let html = '<button class="promotion-btn active" data-promo="all">📋 Toutes</button>';
                 allPromotions.forEach(p => {
                     html += `<button class="promotion-btn" data-promo="${p.id}">📚 ${escapeHtml(p.nom)}</button>`;
                 });
                 container.innerHTML = html;
                 
-                document.querySelectorAll('#promotionButtonsRegistered .promotion-btn').forEach(btn => {
+                container.querySelectorAll('.promotion-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
-                        document.querySelectorAll('#promotionButtonsRegistered .promotion-btn').forEach(b => b.classList.remove('active'));
+                        container.querySelectorAll('.promotion-btn').forEach(b => b.classList.remove('active'));
                         btn.classList.add('active');
-                        currentFilterPromotion = btn.dataset.promo;
+                        currentFilterPromotion = btn.dataset.promo === 'all' ? null : btn.dataset.promo;
                         displayRegisteredStudents();
                     });
                 });
@@ -415,44 +449,28 @@
             let html = '';
             filtres.forEach((r, idx) => {
                 const fichesNoms = r.fichesValidees ? r.fichesValidees.map(f => f.nom).join(', ') : '-';
+                const dateStr = r.dateEnregistrement?.toDate ? 
+                    new Date(r.dateEnregistrement.toDate()).toLocaleString('fr-FR') : 
+                    new Date(r.dateEnregistrement).toLocaleString('fr-FR');
+                
                 html += `
                     <tr>
                         <td>${idx+1}</td>
                         <td><code>${escapeHtml(r.matricule || '-')}</code></td>
                         <td><strong>${escapeHtml(r.etudiantNom)}</strong></td>
                         <td>${escapeHtml(promoMap[r.promotionId] || '-')}</td>
-                        <td><span class="badge ${r.semestre === 'premier' ? 'bg-success' : 'bg-warning'}">${r.semestre === 'premier' ? '1er Semestre' : '2ème Semestre'}</span></td>
+                        <td><span class="badge ${r.semestre === 'premier' ? 'badge-premier' : 'badge-deuxieme'}">${r.semestre === 'premier' ? '1er Semestre' : '2ème Semestre'}</span></td>
                         <td><small>${escapeHtml(fichesNoms)}</small></td>
-                        <td><small>${new Date(r.dateEnregistrement?.toDate()).toLocaleString()}</small></td>
+                        <td><small>${dateStr}</small></td>
                     </tr>
                 `;
             });
             tbody.innerHTML = html;
         }
         
-        // Sélection du semestre
-        document.getElementById('selectPremierSemestre')?.addEventListener('click', () => {
-            const fiches = semestreConfig.premier || [];
-            if(fiches.length === 0) {
-                showToast('Aucune fiche configurée pour le premier semestre.', 'warning');
-                return;
-            }
-            currentSemestre = 'premier';
-            currentFiches = fiches.map(id => allFiches.find(f => f.id === id)).filter(f => f);
-            goToStep2();
-        });
-        
-        document.getElementById('selectDeuxiemeSemestre')?.addEventListener('click', () => {
-            const fiches = semestreConfig.deuxieme || [];
-            if(fiches.length === 0) {
-                showToast('Aucune fiche configurée pour le deuxième semestre.', 'warning');
-                return;
-            }
-            currentSemestre = 'deuxieme';
-            currentFiches = fiches.map(id => allFiches.find(f => f.id === id)).filter(f => f);
-            goToStep2();
-        });
-        
+        // ==========================================
+        // GESTION DES ÉTAPES
+        // ==========================================
         function goToStep2() {
             currentEtudiant = null;
             currentTransaction = null;
@@ -490,147 +508,6 @@
                 <div class="step">3<div class="step-label">Fiches manquantes</div></div>
             `;
         }
-        
-        // Vérification du bordereau unique
-        document.getElementById('verifyUniqueBordereauBtn')?.addEventListener('click', async () => {
-            const numero = document.getElementById('uniqueBordereauInput').value.trim();
-            if(!numero) {
-                showToast('Veuillez entrer un numéro de bordereau', 'warning');
-                return;
-            }
-            
-            const btn = document.getElementById('verifyUniqueBordereauBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<div class="loading-spinner"></div> Vérification...';
-            
-            try {
-                const transactionQuery = await db.collection('transactions').where('numeroRecu', '==', numero).get();
-                const resultDiv = document.getElementById('uniqueBordereauResult');
-                
-                if(transactionQuery.empty) {
-                    resultDiv.style.display = 'block';
-                    resultDiv.className = 'bordereau-card bordereau-invalid';
-                    resultDiv.innerHTML = `<i class="bi bi-x-circle-fill" style="color:#dc3545;"></i> <strong>Bordereau invalide!</strong><br>Aucune transaction trouvée avec ce numéro.`;
-                    return;
-                }
-                
-                const transaction = transactionQuery.docs[0];
-                const transData = transaction.data();
-                const etudiantId = transData.etudiantId;
-                const etudiant = allEtudiants.find(e => e.id === etudiantId || e.matricule === etudiantId);
-                
-                if(!etudiant) {
-                    resultDiv.style.display = 'block';
-                    resultDiv.className = 'bordereau-card bordereau-invalid';
-                    resultDiv.innerHTML = `<i class="bi bi-x-circle-fill" style="color:#dc3545;"></i> <strong>Erreur!</strong><br>Étudiant associé non trouvé.`;
-                    return;
-                }
-                
-                // Vérifier si déjà enregistré
-                const alreadyRegistered = registeredSuccessList.find(r => 
-                    (r.matricule === (etudiant.matricule || etudiant.id)) && r.semestre === currentSemestre
-                );
-                
-                if(alreadyRegistered) {
-                    resultDiv.style.display = 'block';
-                    resultDiv.className = 'bordereau-card bordereau-invalid';
-                    resultDiv.innerHTML = `<i class="bi bi-x-circle-fill" style="color:#dc3545;"></i> <strong>Déjà enregistré!</strong><br>Cet étudiant a déjà été enregistré pour ce semestre.`;
-                    return;
-                }
-                
-                currentEtudiant = etudiant;
-                const promotion = allPromotions.find(p => p.id === etudiant.promotion);
-                currentEtudiant.promotionNom = promotion ? promotion.nom : '-';
-                currentTransaction = transData;
-                
-                // Filtrer les fiches qui concernent la promotion de l'étudiant
-                currentFichesFiltrees = currentFiches.filter(fiche => {
-                    const promotionsFiche = fiche.promotions || (fiche.promotion ? [fiche.promotion] : []);
-                    return promotionsFiche.includes(etudiant.promotion);
-                });
-                
-                // Afficher les fiches ignorées (non concernées par la promotion)
-                const fichesIgnorees = currentFiches.filter(fiche => !currentFichesFiltrees.includes(fiche));
-                
-                // Récupérer les fiches déjà payées dans cette transaction
-                const fichesPayees = transData.fiches || [];
-                const fichesPayeesIds = fichesPayees.map(f => f.id);
-                
-                // Déterminer les fiches manquantes (celles de la promotion qui ne sont pas payées)
-                const fichesManquantes = currentFichesFiltrees.filter(fiche => !fichesPayeesIds.includes(fiche.id));
-                
-                // Afficher les informations de l'étudiant
-                const studentContainer = document.getElementById('studentInfoContainer');
-                studentContainer.style.display = 'block';
-                let ignoreHtml = '';
-                if(fichesIgnorees.length > 0) {
-                    ignoreHtml = `<div class="fiche-skipped mt-2"><i class="bi bi-info-circle"></i> <strong>Fiches ignorées (ne concernent pas cette promotion):</strong><br>${fichesIgnorees.map(f => f.nom).join(', ')}</div>`;
-                }
-                studentContainer.innerHTML = `
-                    <div class="current-student-card">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <strong><i class="bi bi-person-circle"></i> Étudiant:</strong> ${escapeHtml(etudiant.nom)}<br>
-                                <strong><i class="bi bi-upc-scan"></i> Matricule:</strong> ${escapeHtml(etudiant.matricule || etudiant.id)}
-                            </div>
-                            <div class="col-md-6">
-                                <strong><i class="bi bi-trophy"></i> Promotion:</strong> ${escapeHtml(currentEtudiant.promotionNom)}<br>
-                                <strong><i class="bi bi-calendar2-week"></i> Semestre:</strong> ${currentSemestre === 'premier' ? 'Premier Semestre' : 'Deuxième Semestre'}
-                            </div>
-                        </div>
-                        ${ignoreHtml}
-                    </div>
-                `;
-                
-                resultDiv.style.display = 'block';
-                resultDiv.className = 'bordereau-card bordereau-valid';
-                
-                const fichesPayeesHtml = fichesPayees.length > 0 ? `<br><strong>Fiches payées dans ce bordereau:</strong> ${fichesPayees.map(f => f.nom).join(', ')}` : '';
-                
-                if(fichesManquantes.length === 0) {
-                    // Toutes les fiches sont payées -> enregistrement direct
-                    resultDiv.innerHTML = `
-                        <i class="bi bi-check-circle-fill" style="color:#28a745;"></i>
-                        <strong>Bordereau valide!</strong><br>
-                        Toutes les fiches du ${currentSemestre === 'premier' ? 'premier' : 'deuxième'} semestre sont payées dans ce bordereau.${fichesPayeesHtml}
-                    `;
-                    document.getElementById('directValidateBtn').style.display = 'inline-block';
-                    document.getElementById('continueMissingBtn').style.display = 'none';
-                } else {
-                    // Il manque des fiches
-                    resultDiv.innerHTML = `
-                        <i class="bi bi-check-circle-fill" style="color:#28a745;"></i>
-                        <strong>Bordereau valide!</strong><br>
-                        Fiches payées: ${fichesPayees.map(f => f.nom).join(', ') || 'aucune'}<br>
-                        <strong class="text-warning">Fiches manquantes: ${fichesManquantes.map(f => f.nom).join(', ')}</strong>
-                    `;
-                    
-                    // Stocker les fiches manquantes pour l'étape suivante
-                    window.missingFiches = fichesManquantes;
-                    window.existingPayments = fichesPayees;
-                    
-                    document.getElementById('directValidateBtn').style.display = 'none';
-                    document.getElementById('continueMissingBtn').style.display = 'inline-block';
-                }
-                
-            } catch(err) {
-                console.error(err);
-                showToast('Erreur lors de la vérification', 'danger');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-check-lg"></i> Vérifier';
-            }
-        });
-        
-        // Enregistrement direct (toutes les fiches sont déjà payées)
-        document.getElementById('directValidateBtn')?.addEventListener('click', async () => {
-            await enregistrerSucces(currentFichesFiltrees);
-        });
-        
-        // Continuer vers les fiches manquantes
-        document.getElementById('continueMissingBtn')?.addEventListener('click', () => {
-            goToStep3();
-        });
         
         function goToStep3() {
             updateStepIndicatorForStep3();
@@ -745,16 +622,6 @@
             document.getElementById('validateMissingBtn').style.display = 'none';
         }
         
-        // Enregistrement après vérification des fiches manquantes
-        document.getElementById('validateMissingBtn')?.addEventListener('click', async () => {
-            const allFichesToValidate = [...(window.existingPayments || []), ...window.missingValues.filter(v => v.verified).map(v => {
-                const fiche = currentFichesFiltrees.find(f => f.id === v.transaction?.fiches?.find(f => f.id)?.id);
-                return fiche;
-            })];
-            
-            await enregistrerSucces(currentFichesFiltrees);
-        });
-        
         async function enregistrerSucces(fichesValidees) {
             try {
                 const successData = {
@@ -766,7 +633,7 @@
                     semestre: currentSemestre,
                     fichesValidees: fichesValidees.map(f => ({ id: f.id, nom: f.nom, montant: f.montant })),
                     dateEnregistrement: firebase.firestore.FieldValue.serverTimestamp(),
-                    enregistrePar: localStorage.getItem('admin_user') ? JSON.parse(localStorage.getItem('admin_user')).nomComplet : 'Admin'
+                    enregistrePar: 'Agent Paiement'  // Valeur fixe, indépendante de toute session
                 };
                 
                 await db.collection('paiementsSuccess').add(successData);
@@ -788,112 +655,287 @@
                 document.querySelectorAll('.step-container').forEach(step => step.classList.remove('active'));
                 document.getElementById('stepFinal').classList.add('active');
                 
+                showToast('Étudiant enregistré avec succès !', 'success');
+                
             } catch(err) {
                 console.error(err);
                 showToast('Erreur lors de l\'enregistrement', 'danger');
             }
         }
         
-        // Boutons de réinitialisation
-        document.getElementById('resetStep2Btn')?.addEventListener('click', () => {
-            goToStep2();
-        });
-        
-        document.getElementById('resetStep3Btn')?.addEventListener('click', () => {
-            goToStep2();
-        });
-        
-        document.getElementById('newRegistrationBtn')?.addEventListener('click', () => {
-            document.querySelectorAll('.step-container').forEach(step => step.classList.remove('active'));
-            document.getElementById('step1').classList.add('active');
-            document.getElementById('stepIndicator').innerHTML = '';
-        });
-        
-        document.getElementById('viewSuccessListBtn')?.addEventListener('click', () => {
-            const successTab = document.getElementById('succes-tab');
-            new bootstrap.Tab(successTab).show();
-        });
-        
-        // Recherche et export dans l'onglet succès
-        document.getElementById('searchRegisteredStudent')?.addEventListener('input', (e) => {
-            currentSearchRegistered = e.target.value;
-            const clearBtn = document.getElementById('clearSearchRegistered');
-            clearBtn.style.display = currentSearchRegistered ? 'block' : 'none';
-            displayRegisteredStudents();
-        });
-        
-        document.getElementById('clearSearchRegistered')?.addEventListener('click', () => {
-            document.getElementById('searchRegisteredStudent').value = '';
-            currentSearchRegistered = '';
-            document.getElementById('clearSearchRegistered').style.display = 'none';
-            displayRegisteredStudents();
-        });
-        
-        document.getElementById('exportRegisteredExcel')?.addEventListener('click', () => {
-            const promoMap = {};
-            allPromotions.forEach(p => promoMap[p.id] = p.nom);
-            
-            const data = registeredSuccessList.map(r => ({
-                'Matricule': r.matricule,
-                'Nom complet': r.etudiantNom,
-                'Promotion': promoMap[r.promotionId] || '-',
-                'Semestre': r.semestre === 'premier' ? 'Premier Semestre' : 'Deuxième Semestre',
-                'Fiches vérifiées': (r.fichesValidees || []).map(f => f.nom).join(', '),
-                'Date d\'enregistrement': new Date(r.dateEnregistrement?.toDate()).toLocaleString()
-            }));
-            
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Enregistrements');
-            XLSX.writeFile(wb, `enregistrements_succes_${new Date().toISOString().slice(0,19)}.xlsx`);
-            showToast('Export Excel généré');
-        });
-        
-        document.getElementById('exportRegisteredCsv')?.addEventListener('click', () => {
-            const promoMap = {};
-            allPromotions.forEach(p => promoMap[p.id] = p.nom);
-            
-            let csv = 'Matricule,Nom complet,Promotion,Semestre,Fiches vérifiées,Date enregistrement\n';
-            registeredSuccessList.forEach(r => {
-                csv += `"${r.matricule || ''}","${r.etudiantNom}","${promoMap[r.promotionId] || '-'}","${r.semestre === 'premier' ? 'Premier Semestre' : 'Deuxième Semestre'}","${(r.fichesValidees || []).map(f => f.nom).join('; ')}","${new Date(r.dateEnregistrement?.toDate()).toLocaleString()}"\n`;
+        // ==========================================
+        // INITIALISATION DES ÉCOUTEURS D'ÉVÉNEMENTS
+        // ==========================================
+        function initEventListeners() {
+            // Sélection du semestre
+            document.getElementById('selectPremierSemestre')?.addEventListener('click', () => {
+                const fiches = semestreConfig.premier || [];
+                if(fiches.length === 0) {
+                    showToast('Aucune fiche configurée pour le premier semestre.', 'warning');
+                    return;
+                }
+                currentSemestre = 'premier';
+                currentFiches = fiches.map(id => allFiches.find(f => f.id === id)).filter(f => f);
+                goToStep2();
             });
             
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `enregistrements_succes_${new Date().toISOString().slice(0,19)}.csv`;
-            link.click();
-            URL.revokeObjectURL(blob);
-            showToast('Export CSV généré');
-        });
-        
-        document.getElementById('logoutBtn')?.addEventListener('click', () => {
-            localStorage.removeItem('admin_user');
-            window.location.href = 'admin.html';
-        });
-        
-        // Initialisation
-        checkSession();
-        loadData();
-
- 
-        // ========== INITIALISATION ==========
-        
-        initNotificationSound();
-        listenNewTransactions();
-        setupRealtimeListeners();
-        
-        setTimeout(() => requestNotificationPermission(), 5000);
-        
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').then(reg => {
-                    console.log('Service Worker enregistré:', reg.scope);
-                }).catch(err => console.log('Erreur Service Worker:', err));
+            document.getElementById('selectDeuxiemeSemestre')?.addEventListener('click', () => {
+                const fiches = semestreConfig.deuxieme || [];
+                if(fiches.length === 0) {
+                    showToast('Aucune fiche configurée pour le deuxième semestre.', 'warning');
+                    return;
+                }
+                currentSemestre = 'deuxieme';
+                currentFiches = fiches.map(id => allFiches.find(f => f.id === id)).filter(f => f);
+                goToStep2();
+            });
+            
+            // Vérification du bordereau unique
+            document.getElementById('verifyUniqueBordereauBtn')?.addEventListener('click', async () => {
+                const numero = document.getElementById('uniqueBordereauInput').value.trim();
+                if(!numero) {
+                    showToast('Veuillez entrer un numéro de bordereau', 'warning');
+                    return;
+                }
+                
+                const btn = document.getElementById('verifyUniqueBordereauBtn');
+                btn.disabled = true;
+                btn.innerHTML = '<div class="loading-spinner"></div> Vérification...';
+                
+                try {
+                    const transactionQuery = await db.collection('transactions').where('numeroRecu', '==', numero).get();
+                    const resultDiv = document.getElementById('uniqueBordereauResult');
+                    
+                    if(transactionQuery.empty) {
+                        resultDiv.style.display = 'block';
+                        resultDiv.className = 'bordereau-card bordereau-invalid';
+                        resultDiv.innerHTML = `<i class="bi bi-x-circle-fill" style="color:#dc3545;"></i> <strong>Bordereau invalide!</strong><br>Aucune transaction trouvée avec ce numéro.`;
+                        return;
+                    }
+                    
+                    const transaction = transactionQuery.docs[0];
+                    const transData = transaction.data();
+                    const etudiantId = transData.etudiantId;
+                    const etudiant = allEtudiants.find(e => e.id === etudiantId || e.matricule === etudiantId);
+                    
+                    if(!etudiant) {
+                        resultDiv.style.display = 'block';
+                        resultDiv.className = 'bordereau-card bordereau-invalid';
+                        resultDiv.innerHTML = `<i class="bi bi-x-circle-fill" style="color:#dc3545;"></i> <strong>Erreur!</strong><br>Étudiant associé non trouvé.`;
+                        return;
+                    }
+                    
+                    // Vérifier si déjà enregistré
+                    const alreadyRegistered = registeredSuccessList.find(r => 
+                        (r.matricule === (etudiant.matricule || etudiant.id)) && r.semestre === currentSemestre
+                    );
+                    
+                    if(alreadyRegistered) {
+                        resultDiv.style.display = 'block';
+                        resultDiv.className = 'bordereau-card bordereau-invalid';
+                        resultDiv.innerHTML = `<i class="bi bi-x-circle-fill" style="color:#dc3545;"></i> <strong>Déjà enregistré!</strong><br>Cet étudiant a déjà été enregistré pour ce semestre.`;
+                        return;
+                    }
+                    
+                    currentEtudiant = etudiant;
+                    const promotion = allPromotions.find(p => p.id === etudiant.promotion);
+                    currentEtudiant.promotionNom = promotion ? promotion.nom : '-';
+                    currentTransaction = transData;
+                    
+                    // Filtrer les fiches qui concernent la promotion de l'étudiant
+                    currentFichesFiltrees = currentFiches.filter(fiche => {
+                        const promotionsFiche = fiche.promotions || (fiche.promotion ? [fiche.promotion] : []);
+                        return promotionsFiche.includes(etudiant.promotion);
+                    });
+                    
+                    // Afficher les fiches ignorées
+                    const fichesIgnorees = currentFiches.filter(fiche => !currentFichesFiltrees.includes(fiche));
+                    
+                    // Récupérer les fiches déjà payées
+                    const fichesPayees = transData.fiches || [];
+                    const fichesPayeesIds = fichesPayees.map(f => f.id);
+                    
+                    // Déterminer les fiches manquantes
+                    const fichesManquantes = currentFichesFiltrees.filter(fiche => !fichesPayeesIds.includes(fiche.id));
+                    
+                    // Afficher les informations de l'étudiant
+                    const studentContainer = document.getElementById('studentInfoContainer');
+                    studentContainer.style.display = 'block';
+                    let ignoreHtml = '';
+                    if(fichesIgnorees.length > 0) {
+                        ignoreHtml = `<div class="fiche-skipped mt-2"><i class="bi bi-info-circle"></i> <strong>Fiches ignorées (ne concernent pas cette promotion):</strong><br>${fichesIgnorees.map(f => f.nom).join(', ')}</div>`;
+                    }
+                    studentContainer.innerHTML = `
+                        <div class="current-student-card">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong><i class="bi bi-person-circle"></i> Étudiant:</strong> ${escapeHtml(etudiant.nom)}<br>
+                                    <strong><i class="bi bi-upc-scan"></i> Matricule:</strong> ${escapeHtml(etudiant.matricule || etudiant.id)}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong><i class="bi bi-trophy"></i> Promotion:</strong> ${escapeHtml(currentEtudiant.promotionNom)}<br>
+                                    <strong><i class="bi bi-calendar2-week"></i> Semestre:</strong> ${currentSemestre === 'premier' ? 'Premier Semestre' : 'Deuxième Semestre'}
+                                </div>
+                            </div>
+                            ${ignoreHtml}
+                        </div>
+                    `;
+                    
+                    resultDiv.style.display = 'block';
+                    resultDiv.className = 'bordereau-card bordereau-valid';
+                    
+                    const fichesPayeesHtml = fichesPayees.length > 0 ? `<br><strong>Fiches payées dans ce bordereau:</strong> ${fichesPayees.map(f => f.nom).join(', ')}` : '';
+                    
+                    if(fichesManquantes.length === 0) {
+                        resultDiv.innerHTML = `
+                            <i class="bi bi-check-circle-fill" style="color:#28a745;"></i>
+                            <strong>Bordereau valide!</strong><br>
+                            Toutes les fiches du ${currentSemestre === 'premier' ? 'premier' : 'deuxième'} semestre sont payées dans ce bordereau.${fichesPayeesHtml}
+                        `;
+                        document.getElementById('directValidateBtn').style.display = 'inline-block';
+                        document.getElementById('continueMissingBtn').style.display = 'none';
+                    } else {
+                        resultDiv.innerHTML = `
+                            <i class="bi bi-check-circle-fill" style="color:#28a745;"></i>
+                            <strong>Bordereau valide!</strong><br>
+                            Fiches payées: ${fichesPayees.map(f => f.nom).join(', ') || 'aucune'}<br>
+                            <strong class="text-warning">Fiches manquantes: ${fichesManquantes.map(f => f.nom).join(', ')}</strong>
+                        `;
+                        
+                        window.missingFiches = fichesManquantes;
+                        window.existingPayments = fichesPayees;
+                        
+                        document.getElementById('directValidateBtn').style.display = 'none';
+                        document.getElementById('continueMissingBtn').style.display = 'inline-block';
+                    }
+                    
+                } catch(err) {
+                    console.error(err);
+                    showToast('Erreur lors de la vérification', 'danger');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-check-lg"></i> Vérifier';
+                }
+            });
+            
+            // Enregistrement direct
+            document.getElementById('directValidateBtn')?.addEventListener('click', async () => {
+                await enregistrerSucces(currentFichesFiltrees);
+            });
+            
+            // Continuer vers les fiches manquantes
+            document.getElementById('continueMissingBtn')?.addEventListener('click', () => {
+                goToStep3();
+            });
+            
+            // Enregistrement après vérification des fiches manquantes
+            document.getElementById('validateMissingBtn')?.addEventListener('click', async () => {
+                const allFichesToValidate = [...(window.existingPayments || []), ...window.missingValues.filter(v => v.verified).map(v => {
+                    const fiche = currentFichesFiltrees.find(f => f.id === v.transaction?.fiches?.find(f => f.id)?.id);
+                    return fiche;
+                })].filter(f => f);
+                
+                await enregistrerSucces(currentFichesFiltrees);
+            });
+            
+            // Boutons de réinitialisation
+            document.getElementById('resetStep2Btn')?.addEventListener('click', () => {
+                goToStep2();
+            });
+            
+            document.getElementById('resetStep3Btn')?.addEventListener('click', () => {
+                goToStep2();
+            });
+            
+            document.getElementById('newRegistrationBtn')?.addEventListener('click', () => {
+                document.querySelectorAll('.step-container').forEach(step => step.classList.remove('active'));
+                document.getElementById('step1').classList.add('active');
+                document.getElementById('stepIndicator').innerHTML = '';
+                currentSemestre = null;
+                currentEtudiant = null;
+            });
+            
+            document.getElementById('viewSuccessListBtn')?.addEventListener('click', () => {
+                const successTab = document.getElementById('succes-tab');
+                const bsTab = new bootstrap.Tab(successTab);
+                bsTab.show();
+            });
+            
+            // Recherche et export dans l'onglet succès
+            document.getElementById('searchRegisteredStudent')?.addEventListener('input', (e) => {
+                currentSearchRegistered = e.target.value;
+                const clearBtn = document.getElementById('clearSearchRegistered');
+                if(clearBtn) clearBtn.style.display = currentSearchRegistered ? 'block' : 'none';
+                displayRegisteredStudents();
+            });
+            
+            document.getElementById('clearSearchRegistered')?.addEventListener('click', () => {
+                const input = document.getElementById('searchRegisteredStudent');
+                if(input) input.value = '';
+                currentSearchRegistered = '';
+                document.getElementById('clearSearchRegistered').style.display = 'none';
+                displayRegisteredStudents();
+            });
+            
+            document.getElementById('exportRegisteredExcel')?.addEventListener('click', () => {
+                const promoMap = {};
+                allPromotions.forEach(p => promoMap[p.id] = p.nom);
+                
+                const data = registeredSuccessList.map(r => ({
+                    'Matricule': r.matricule,
+                    'Nom complet': r.etudiantNom,
+                    'Promotion': promoMap[r.promotionId] || '-',
+                    'Semestre': r.semestre === 'premier' ? 'Premier Semestre' : 'Deuxième Semestre',
+                    'Fiches vérifiées': (r.fichesValidees || []).map(f => f.nom).join(', '),
+                    'Date d\'enregistrement': r.dateEnregistrement?.toDate ? 
+                        new Date(r.dateEnregistrement.toDate()).toLocaleString('fr-FR') : 
+                        new Date(r.dateEnregistrement).toLocaleString('fr-FR'),
+                    'Enregistré par': r.enregistrePar || 'Agent Paiement'
+                }));
+                
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Enregistrements');
+                XLSX.writeFile(wb, `enregistrements_succes_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`);
+                showToast('Export Excel généré', 'success');
+            });
+            
+            document.getElementById('exportRegisteredCsv')?.addEventListener('click', () => {
+                const promoMap = {};
+                allPromotions.forEach(p => promoMap[p.id] = p.nom);
+                
+                let csv = 'Matricule;Nom complet;Promotion;Semestre;Fiches vérifiées;Date enregistrement;Enregistré par\n';
+                registeredSuccessList.forEach(r => {
+                    const dateStr = r.dateEnregistrement?.toDate ? 
+                        new Date(r.dateEnregistrement.toDate()).toLocaleString('fr-FR') : 
+                        new Date(r.dateEnregistrement).toLocaleString('fr-FR');
+                    csv += `"${r.matricule || ''}";"${r.etudiantNom}";"${promoMap[r.promotionId] || '-'}";"${r.semestre === 'premier' ? 'Premier Semestre' : 'Deuxième Semestre'}";"${(r.fichesValidees || []).map(f => f.nom).join('; ')}";"${dateStr}";"${r.enregistrePar || 'Agent Paiement'}"\n`;
+                });
+                
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `enregistrements_succes_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.csv`;
+                link.click();
+                URL.revokeObjectURL(blob);
+                showToast('Export CSV généré', 'success');
             });
         }
         
+        // ==========================================
+        // INITIALISATION
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            initEventListeners();
+            
+            // Service Worker pour PWA
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('Service Worker enregistré:', reg.scope);
+                }).catch(err => console.log('Erreur Service Worker:', err));
+            }
+        });
     </script>
-
 </body>
 </html>
